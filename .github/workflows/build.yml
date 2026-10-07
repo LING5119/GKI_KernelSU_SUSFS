@@ -817,6 +817,15 @@ jobs:
 
       - name: 备份基准 defconfig
         run: cp "$DEFCONFIG" "$DEFCONFIG.orig"
+      - name: 禁用 GKI 受保护符号导出（修复 Google 签名模块 EPERM）
+        run: |
+          # 根因：CONFIG_MODULE_SIG_PROTECT=y 时，内核无 Google 公钥导致 rfkill.ko sig_ok=false，
+          # 未签名模块导出受保护符号 rfkill_alloc 被 verify_exported_symbols 返回 -EACCES(EPERM)，
+          # 进而 cfg80211/mac80211/wlan_drv_gen4m 连锁失败、WiFi 不可用。
+          # 清空 PROTECT_LIST 后，CONFIG_MODULE_SIG_PROTECT(def_bool y 且依赖 PROTECT_LIST!="") 自动禁用。
+          sed -i '/^CONFIG_MODULE_SIG_PROTECT_LIST=/d' "$DEFCONFIG"
+          echo 'CONFIG_MODULE_SIG_PROTECT_LIST=""' >> "$DEFCONFIG"
+          echo "已禁用 CONFIG_MODULE_SIG_PROTECT：PROTECT_LIST 清空"
 
       - name: 集成 NoMount 挂载元模块
         if: inputs.use_nomount
